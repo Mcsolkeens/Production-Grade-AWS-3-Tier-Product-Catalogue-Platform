@@ -1,0 +1,15 @@
+{
+  "name": "web-tier",
+  "version": "1.0.0",
+  "description": "Web tier for 3-tier AWS architecture",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev":   "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios":   "^1.6.0",
+    "morgan":  "^1.10.0"
+  }
+}

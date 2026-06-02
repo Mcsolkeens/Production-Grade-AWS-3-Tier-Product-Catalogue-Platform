@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AWS 3-Tier Demo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      padding: 32px 24px;
+    }
+
+    header {
+      background: #0D1B2E;
+      color: #fff;
+      padding: 24px 32px;
+      border-radius: 12px;
+      margin-bottom: 28px;
+    }
+    header h1  { font-size: 24px; margin-bottom: 6px; }
+    header p   { color: #9CA3AF; font-size: 13px; }
+    .badge     { display: inline-block; background: #D45F00; color: #fff;
+                 padding: 2px 12px; border-radius: 20px; font-size: 11px;
+                 font-weight: 600; margin-top: 10px; }
+
+    .controls {
+      display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;
+      align-items: center;
+    }
+    button {
+      padding: 10px 20px; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:hover        { opacity: 0.85; }
+    .btn-primary        { background: #1D4ED8; color: #fff; }
+    .btn-danger         { background: #B91C1C; color: #fff; }
+    .btn-success        { background: #166534; color: #fff; }
+
+    #status {
+      background: #fff; border-radius: 8px; padding: 10px 16px;
+      font-size: 12px; color: #6B7280; margin-bottom: 20px;
+      border-left: 4px solid #D45F00;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: #fff; border-radius: 10px; padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07);
+      border-top: 3px solid #1D4ED8;
+      position: relative;
+    }
+    .card h3    { color: #0D1B2E; font-size: 15px; margin-bottom: 8px; }
+    .card p     { color: #6B7280; font-size: 13px; margin-bottom: 14px; line-height: 1.5; }
+    .price      { font-size: 24px; font-weight: 700; color: #D45F00; }
+    .stock      { font-size: 11px; color: #9CA3AF; margin-top: 4px; }
+    .card-id    { position: absolute; top: 10px; right: 12px;
+                  background: #F3F4F6; color: #9CA3AF;
+                  font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+    .delete-btn {
+      margin-top: 14px; width: 100%; padding: 8px; background: #FEF2F2;
+      color: #B91C1C; border: 1px solid #FCA5A5; border-radius: 6px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .delete-btn:hover { background: #B91C1C; color: #fff; }
+
+    .error {
+      background: #FEF2F2; border-left: 4px solid #B91C1C;
+      padding: 16px 20px; border-radius: 8px; color: #B91C1C; font-size: 14px;
+    }
+
+    /* Add product modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #fff; border-radius: 12px; padding: 32px;
+      width: 100%; max-width: 420px; box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    }
+    .modal h2       { margin-bottom: 20px; color: #0D1B2E; }
+    .field          { margin-bottom: 14px; }
+    .field label    { display: block; font-size: 12px; font-weight: 600;
+                      color: #374151; margin-bottom: 4px; }
+    .field input, .field textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid #D1D5DB;
+      border-radius: 6px; font-size: 14px; color: #111827;
+    }
+    .field input:focus, .field textarea:focus {
+      outline: none; border-color: #1D4ED8; box-shadow: 0 0 0 3px #EFF6FF;
+    }
+    .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+    .modal-buttons button { flex: 1; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>AWS 3-Tier Architecture Demo</h1>
+  <p>Browser → Nginx → Node.js → Internal ALB → Flask → Aurora MySQL</p>
+  <div class="badge">CloudFront + WAF + External ALB + Web EC2 + App EC2 + Aurora</div>
+</header>
+
+<div class="controls">
+  <button class="btn-primary" onclick="loadProducts()">↻ Refresh Products</button>
+  <button class="btn-success" onclick="openModal()">+ Add Product</button>
+</div>
+
+<div id="status">Loading...</div>
+<div id="products" class="grid"></div>
+
+<!-- Add Product Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2>Add New Product</h2>
+    <div class="field">
+      <label>Product Name *</label>
+      <input type="text" id="f-name" placeholder="e.g. EC2 Instance Pack"/>
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <textarea id="f-desc" rows="3" placeholder="Brief description"></textarea>
+    </div>
+    <div class="field">
+      <label>Price (USD) *</label>
+      <input type="number" id="f-price" step="0.01" placeholder="9.99"/>
+    </div>
+    <div class="field">
+      <label>Stock</label>
+      <input type="number" id="f-stock" placeholder="100"/>
+    </div>
+    <div class="modal-buttons">
+      <button class="btn-primary" onclick="addProduct()">Create</button>
+      <button onclick="closeModal()" style="background:#F3F4F6;color:#374151;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+async function loadProducts() {
+  const status   = document.getElementById('status');
+  const grid     = document.getElementById('products');
+  const start    = Date.now();
+  status.textContent = 'Fetching from App tier → Aurora...';
+
+  try {
+    const res  = await fetch('/api/products');
+    const data = await res.json();
+    const ms   = Date.now() - start;
+
+    status.textContent =
+      `✓  ${data.count} products loaded from Aurora in ${ms}ms  |  ` +
+      `Flow: Browser → Nginx → Node.js → Internal ALB → Flask API → Aurora`;
+
+    grid.innerHTML = data.products.map(p => `
+      <div class="card">
+        <span class="card-id">#${p.id}</span>
+        <h3>${p.name}</h3>
+        <p>${p.description || 'No description'}</p>
+        <div class="price">$${parseFloat(p.price).toFixed(2)}</div>
+        <div class="stock">${p.stock} units in stock</div>
+        <button class="delete-btn" onclick="deleteProduct(${p.id}, this)">
+          Delete
+        </button>
+      </div>
+    `).join('');
+
+  } catch (err) {
+    status.innerHTML = '';
+    grid.innerHTML   = `
+      <div class="error">
+        <strong>Could not load products</strong><br/>
+        ${err.message}<br/><br/>
+        Check: App EC2 health, Internal ALB target group, sg-app security group
+      </div>`;
+  }
+}
+
+async function addProduct() {
+  const name  = document.getElementById('f-name').value.trim();
+  const desc  = document.getElementById('f-desc').value.trim();
+  const price = parseFloat(document.getElementById('f-price').value);
+  const stock = parseInt(document.getElementById('f-stock').value) || 0;
+
+  if (!name || !price) {
+    alert('Name and Price are required');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/products', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name, description: desc, price, stock })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      closeModal();
+      loadProducts();
+    } else {
+      alert('Error: ' + data.error);
+    }
+  } catch (err) {
+    alert('Request failed: ' + err.message);
+  }
+}
+
+async function deleteProduct(id, btn) {
+  if (!confirm(`Delete product #${id}?`)) return;
+  btn.textContent = 'Deleting...';
+  try {
+    const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      loadProducts();
+    } else {
+      const data = await res.json();
+      alert('Error: ' + data.error);
+      btn.textContent = 'Delete';
+    }
+  } catch (err) {
+    alert('Request failed: ' + err.message);
+    btn.textContent = 'Delete';
+  }
+}
+
+function openModal()  { document.getElementById('modal').classList.add('open'); }
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  ['f-name','f-desc','f-price','f-stock'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+}
+
+// Close modal on overlay click
+document.getElementById('modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// Load on page open
+loadProducts();
+</script>
+</body>
+</html>

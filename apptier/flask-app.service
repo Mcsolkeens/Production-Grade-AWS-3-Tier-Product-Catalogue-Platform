@@ -1,0 +1,21 @@
+[Unit]
+Description=Flask App Tier — 3-Tier AWS Architecture
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/opt/app
+EnvironmentFile=/etc/environment
+ExecStart=/usr/local/bin/gunicorn \
+    --bind 0.0.0.0:5000 \
+    --workers 4 \
+    --timeout 60 \
+    --access-logfile /var/log/flask-access.log \
+    --error-logfile /var/log/flask-error.log \
+    app:app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
