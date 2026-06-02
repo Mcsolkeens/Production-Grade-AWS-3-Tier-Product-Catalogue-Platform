@@ -43,7 +43,7 @@ Browser (HTTPS)
 ---
 
 
-### Application Screenshot
+### Live Application Screenshot
 
 ![Live Product Catalogue](docs/live-application-demo.png)
 
